@@ -1,11 +1,12 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
+import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
 
 import Protobuf from 'pbf';
 import RBush from 'rbush';
 import { VectorTile } from '@mapbox/vector-tile';
 
-import { utilRebind, utilTiler } from '../util';
+import { utilRebind, utilSetTransform, utilTiler } from '../util';
 import {geoExtent, geoScaleToZoom} from '../geo';
 import {localizer} from '../core/localizer';
 
@@ -18,6 +19,10 @@ const tileStyle = '&STYLE=&TILEMATRIX=EPSG:900913:{z}&TILEMATRIXSET=EPSG:900913&
 
 const minZoom = 14;
 const dispatch = d3_dispatch('change', 'loadedImages', 'loadedLine');
+const imgZoom = d3_zoom()
+    .extent([[0, 0], [320, 240]])
+    .translateExtent([[0, 0], [320, 240]])
+    .scaleExtent([1, 15]);
 const pannellumViewerCSS = 'pannellum-streetside/pannellum.css';
 const pannellumViewerJS = 'pannellum-streetside/pannellum.js';
 const resolution = 1080;
@@ -346,6 +351,11 @@ export default {
             .attr('href', `https://mapilio.com/app?lat=${d.loc[1]}&lng=${d.loc[0]}&zoom=17&pId=${d.id}`)
             .text('mapilio.com');
 
+        wrap
+            .transition()
+            .duration(100)
+            .call(imgZoom.transform, d3_zoomIdentity);
+
         getImageData(d.id,d.sequence_id).then(function () {
 
             if (d.isPano){
@@ -423,7 +433,9 @@ export default {
         let wrapEnter = wrap.enter()
             .append('div')
             .attr('class', 'photo-wrapper mapilio-wrapper')
-            .classed('hide', true);
+            .classed('hide', true)
+            .call(imgZoom.on('zoom', zoomPan))
+            .on('dblclick.zoom', null);
 
         wrapEnter
             .append('div')
@@ -451,9 +463,14 @@ export default {
 
 
         // Register viewer resize handler
-        context.ui().photoviewer.on('resize.mapilio', () => {
+        context.ui().photoviewer.on('resize.mapilio', dimensions => {
             if (_pannellumViewer) {
                 _pannellumViewer.resize();
+            } else {
+                dimensions = dimensions.map(d => d - 10);
+                imgZoom
+                    .extent([[0, 0], dimensions])
+                    .translateExtent([[0, 0], dimensions]);
             }
         });
 
@@ -513,6 +530,12 @@ export default {
 
                 that.selectImage(context, nextImage.id);
             };
+        }
+
+        function zoomPan(d3_event) {
+            var t = d3_event.transform;
+            context.container().select('.photoviewer #ideditor-viewer-mapilio')
+                .call(utilSetTransform, t.x, t.y, t.k);
         }
 
         return _loadViewerPromise;
