@@ -1683,7 +1683,7 @@ input.date-selector {
 .form-field-input-multicombo li.chip.negated span {
     text-decoration: line-through;
 }
-.form-field-input-multicombo li.chip input {
+.form-field-input-multicombo li.chip input[type="checkbox"] {
     width: 1em;
     height: 11px;
     margin-top: 7px;
@@ -1835,6 +1835,44 @@ input.date-selector {
 .ideditor[dir='rtl'] .form-field-input-multicombo li.chip .tag-value-icon .icon {
     margin-right: 6px;
     margin-left: 0;
+}
+
+
+/* Field - Destination
+------------------------------------------------------- */
+.form-field-input-destination li.chip ul.rows li {
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+.form-field-input-destination li.chip ul.rows li:first-child input {
+    color: #7092ff;
+}
+.form-field-input-destination li.chip ul.rows {
+    display: none;
+}
+.form-field-input-destination li.chip.expanded ul.rows {
+    display: block;
+    margin-bottom: -1px;
+    margin-right: -1px;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 4px;
+}
+.form-field-input-destination li.chip.expanded ul.rows li {
+    border-radius: 0;
+}
+.form-field-input-destination li.chip.expanded ul.rows li input {
+    border-style: solid;
+    border-color: #ccc;
+}
+.form-field-input-destination li.chip.expanded {
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+}
+.form-field-input-destination li.chip.expanded > span,
+.form-field-input-destination li.chip.expanded > .field_buttons {
+    display: none;
 }
 
 

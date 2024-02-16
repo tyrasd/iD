@@ -43,6 +43,7 @@ export function uiFieldCombo(field, context) {
     var _tags;
     var _countryCode;
     var _staticPlaceholder;
+    var _subKeys = field.key === 'destination' ? ['destination:ref', 'destination:symbol', 'destination:colour'] : [];
 
     // initialize deprecated tags array
     var _dataDeprecated = [];
@@ -410,6 +411,11 @@ export function uiFieldCombo(field, context) {
         if (_isMulti) {
             t[d.key] = undefined;
         } else if (_isSemi) {
+            _subKeys.filter(subKey => _tags[subKey]).forEach(subKey => {
+                let subTag = _tags[subKey].split(';');
+                subTag = subTag.map((v, idx) => _multiData[idx].key === d.key ? null : v);
+                t[subKey] = subTag.join(';');
+            });
             var arr = _multiData.map(function(md) {
                 return md.key === d.key ? null : md.key;
             }).filter(Boolean);
@@ -719,7 +725,7 @@ export function uiFieldCombo(field, context) {
                 registerDragAndDrop(chips);
             }
 
-            chips.each(function(d) {
+            chips.each(function(d, idx) {
                 const selection = d3_select(this);
                 const text_span = selection.select('span');
                 const field_buttons = selection.select('.field_buttons');
@@ -742,9 +748,16 @@ export function uiFieldCombo(field, context) {
                 }
                 if (d.display) {
                     d.display(text_span);
-                    return;
+                } else {
+                    text_span.text(d.value);
                 }
-                text_span.text(d.value);
+
+                _subKeys.filter(subKey => typeof tags[subKey] === 'string').forEach(subKey => {
+                    const subTag = tags[subKey].split(';');
+                    text_span.append('span')
+                        .text(` (${subTag[idx]})`);
+                });
+
             });
 
             chips.select('a.remove')
@@ -902,9 +915,15 @@ export function uiFieldCombo(field, context) {
                     .style('transform', null);
 
                 if (typeof targetIndex === 'number') {
-                    var element = _multiData[index];
-                    _multiData.splice(index, 1);
-                    _multiData.splice(targetIndex, 0, element);
+                    function moveElement(array, from, to) {
+                        if (array.length <= Math.max(from, to)) {
+                            array.length = Math.max(from, to) + 1;
+                        }
+                        const element = array[from];
+                        array.splice(from, 1);
+                        array.splice(to, 0, element);
+                    }
+                    moveElement(_multiData, index, targetIndex);
 
                     var t = {};
 
@@ -915,6 +934,12 @@ export function uiFieldCombo(field, context) {
                     } else {
                         t[field.key] = undefined;
                     }
+
+                    _subKeys.filter(subKey => _tags[subKey]).forEach(subKey => {
+                        let subTag = _tags[subKey].split(';');
+                        moveElement(subTag, index, targetIndex);
+                        t[subKey] = subTag.join(';');
+                    });
 
                     dispatch.call('change', this, t);
                 }

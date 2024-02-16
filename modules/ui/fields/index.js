@@ -30,6 +30,10 @@ import {
 } from './combo';
 
 import {
+    uiFieldDestination
+} from './destination';
+
+import {
     uiFieldColour,
     uiFieldEmail,
     uiFieldIdentifier,
@@ -65,6 +69,7 @@ export var uiFields = {
     cycleway: uiFieldDirectionalCombo,
     date: uiFieldText,
     defaultCheck: uiFieldDefaultCheck,
+    destination: uiFieldDestination,
     directionalCombo: uiFieldDirectionalCombo,
     email: uiFieldEmail,
     identifier: uiFieldIdentifier,
