@@ -1840,6 +1840,14 @@ input.date-selector {
 
 /* Field - Destination
 ------------------------------------------------------- */
+.wrap-form-field-destination_ref_oneway,
+.wrap-form-field-destination_symbol_oneway,
+.wrap-form-field-destination_colour_oneway,
+.wrap-form-field-destination_ref,
+.wrap-form-field-destination_symbol,
+.wrap-form-field-destination_colour {
+    display: none;
+}
 .form-field-input-destination li.chip ul.rows li {
     margin: 0;
     padding: 0;
@@ -1864,6 +1872,7 @@ input.date-selector {
 .form-field-input-destination li.chip.expanded ul.rows li input {
     border-style: solid;
     border-color: #ccc;
+    height: 100%;
 }
 .form-field-input-destination li.chip.expanded {
     padding-top: 0;
@@ -4356,6 +4365,15 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 }
 .inspector-hover .form-field-input-radio .structure-extras-wrap {
     border: 0;
+}
+
+/* declutter chips */
+.inspector-hover .chip .hide-toggle,
+.inspector-hover .chip input {
+    opacity: 0;
+}
+.inspector-hover .chip div {
+    overflow-y: hidden;
 }
 
 

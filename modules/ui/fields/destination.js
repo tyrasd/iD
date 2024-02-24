@@ -18,21 +18,35 @@ export function uiFieldDestination(field, context) {
     const dispatch = d3_dispatch('change', 'input');
     let _addInput = d3_select(null);
     // todo: var _lengthIndicator = uiLengthIndicator(context.maxCharsForTagValue());
-    //let _tags;
+
+    let _tags = {};
 
     let _selection = d3_select(null);
     let _container = d3_select(null);
     let _destinations = [];
 
     const _separator = ';';
-    const _subKeys = [
-        'destination:ref',
-        'destination:colour',
-        'destination:symbol'
-    ]
 
+    let _subFields = [];
+    let _moreSubFields = [];
+    let _subKeys = [];
 
     function destination(selection) {
+        if (context.mode().id === 'select') {
+            // initialize sub-fields when an entity is selected
+            const entity = context.entity(context.selectedIDs()[0]);
+            const preset = presetManager.match(entity, context.graph());
+            _subFields = preset.fields()
+                .filter(subField => field.keys.includes(subField.key));
+            _moreSubFields = preset.moreFields()
+                .filter(subField => field.keys.includes(subField.key));
+            _subKeys = _subFields.concat(_moreSubFields).map(f => f.key);
+        } else {
+            _subFields = [];
+            _moreSubFields = [];
+            _subKeys = [];
+        }
+
         _selection = selection;
 
         _container = selection.selectAll('.form-field-input-wrap')
@@ -51,10 +65,6 @@ export function uiFieldDestination(field, context) {
             .append('ul')
             .classed('chiplist', true)
             .classed('full-line-chips', true)
-            .on('click', function() {
-                //todo: add input field
-                //window.setTimeout(function() { _input.node().focus(); }, 10);
-            })
             .merge(_container);
 
         let _inputWrap = _container.selectAll('.input-wrap')
@@ -73,7 +83,6 @@ export function uiFieldDestination(field, context) {
             .attr('type', 'text')
             .attr('id', field.domId)
             .call(utilNoAuto)
-            //.call(initCombo, _container)
             .attr('placeholder', t('inspector.add'))
             .on('change', addNew)
             .on('blur', addNew)
@@ -129,14 +138,25 @@ export function uiFieldDestination(field, context) {
         const detailsTable = enter.append('ul')
             .classed('rows', true);
 
-        for (let key of [field.key].concat(_subKeys)) {
+            /// ->->->-> after merge <-<-<-<-<- ////
+            /// ->->->-> after merge <-<-<-<-<- ////
+            /// ->->->-> after merge <-<-<-<-<- ////
+            /// ->->->-> after merge <-<-<-<-<- ////
+            /// ->->->-> after merge <-<-<-<-<- ////
+            /// ->->->-> after merge <-<-<-<-<- ////
+        const detailFields = [field]
+            .concat(_subFields)
+            // list sub-fields from "moreFields" which are set by a tag
+            .concat(_moreSubFields.filter(f => _tags[f.key] !== undefined));
+        for (let f of detailFields) {
+            const key = f.key;
             const row = detailsTable
                 .append('li')
                 .classed('labeled-input', true);
                 // todo: specific subtag class
             row.append('span')
                 .classed('label', true)
-                .text(key); //todo: translatable string
+                .call(f.label());
             const input = row.append('div')
                 //.classed('preset-…#input-wrap', true)
                 .append('input')
@@ -146,19 +166,16 @@ export function uiFieldDestination(field, context) {
                 .on('change', changeSubKey)
                 .on('blur', changeSubKey);
 
-            if (key === 'destination:symbol') {
-                input.each(function(d) {
-                    d3_select(this).call(uiCombobox(context, 'destination-symbol')
-                        .data(['centre', 'station'].map(value => ({value}))));
-                        //todo: bug: drop down does not open on carret click???
+            if (f.options) {
+                input.each(function() {
+                    d3_select(this).call(uiCombobox(context)
+                        .data(f.options.map(value => ({ value }))));
                 })
             }
 
-
             function changeSubKey(d3_event, d) {
-                var value = context.cleanTagValue(utilGetSetValue(d3_select(this)));
-
-                var t = {};
+                const value = context.cleanTagValue(utilGetSetValue(d3_select(this)));
+                const t = {};
                 if (key === field.key) {
                     _destinations[d.idx].value = value;
                     t[key] = _destinations.map(x => x.value).join(_separator);
@@ -170,6 +187,42 @@ export function uiFieldDestination(field, context) {
                 }
                 //todo: // don't override multiple values with blank string //if (!value && typeof _tags[d] !== 'string') return;
 
+                dispatch.call('change', this, t);
+            }
+        }
+        const remainingMoreFields = _moreSubFields.filter(f => _tags[f.key] === undefined);
+        if (remainingMoreFields.length > 0) {
+            // allow to append extra moreFields as additional sub field
+            const row = detailsTable
+                .append('li')
+                .classed('labeled-input', true);
+            row.append('span')
+                .classed('label', true)
+                .append('input')
+                .attr('type', 'text')
+                .attr('readonly', 'readonly')
+                .classed(`preset-destination preset-destination-add-subfields`, true)
+                .call(utilNoAuto)
+                .on('change', addMoreSubField)
+                .on('blur', addMoreSubField)
+                .each(function() {
+                    d3_select(this).call(uiCombobox(context)
+                        .minItems(1)
+                        .data(remainingMoreFields.concat(remainingMoreFields).map(f => ({
+                            value: f.key,
+                            title: f.title(),
+                            display: f.label(),
+                            terms: f.terms()
+                        })))
+                    );
+                });
+            row.append('div');
+
+            function addMoreSubField(d3_event, d) {
+                const value = context.cleanTagValue(utilGetSetValue(d3_select(this)));
+                if (value === '') return;
+                const t = {};
+                t[value] = '';
                 dispatch.call('change', this, t);
             }
         }
@@ -231,18 +284,6 @@ export function uiFieldDestination(field, context) {
         d3_event.preventDefault();
         d3_event.stopPropagation();
         var t = {};
-        /*
-        _subKeys.filter(subKey => _tags[subKey]).forEach(subKey => {
-            let subTag = _tags[subKey].split(';');
-            subTag = subTag.map((v, idx) => _multiData[idx].key === d.key ? null : v);
-            t[subKey] = subTag.join(';');
-        });
-        var arr = _destinations.map(function(md) {
-            return md.idx === d.idx ? null : md.value;
-        }).filter(Boolean);
-        arr = utilArrayUniq(arr);
-        t[field.key] = arr.length ? arr.join(';') : undefined;
-        */
 
         _destinations = _destinations.filter(x => x.idx !== d.idx);
         t[field.key] = _destinations.map(x => x.value).join(_separator);//todo: this needed? -> || undefined;
@@ -366,7 +407,7 @@ export function uiFieldDestination(field, context) {
 
 
     destination.tags = function(tags) {
-        //_tags = tags;
+        _tags = tags;
 
         const isMixed = Array.isArray(tags[field.key]);
 
@@ -384,12 +425,6 @@ export function uiFieldDestination(field, context) {
             }
             return destination;
         }).map((x, idx) => ({idx, ...x}));
-
-        /*
-        utilGetSetValue(addInput, isMixed ? '' : tags[field.key])
-            .attr('title', isMixed ? tags[field.key].filter(Boolean).join('\n') : undefined)
-            .attr('placeholder', isMixed ? t('inspector.multiple_values') : field.placeholder())
-            .classed('mixed', isMixed);*/
 
         _selection
             .call(destination);

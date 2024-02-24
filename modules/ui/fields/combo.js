@@ -13,6 +13,7 @@ import { svgIcon } from '../../svg/icon';
 import { utilKeybinding } from '../../util/keybinding';
 import { utilArrayUniq, utilGetSetValue, utilNoAuto, utilRebind, utilTotalExtent, utilUnicodeCharsCount } from '../../util';
 import { uiLengthIndicator } from '../length_indicator';
+import { uiFieldDestination } from './destination';
 
 export {
     uiFieldCombo as uiFieldManyCombo,
@@ -23,6 +24,15 @@ export {
 };
 
 export function uiFieldCombo(field, context) {
+    if (field.key === 'destination') {
+        field.keys = [
+            'destination:ref',
+            'destination:colour',
+            'destination:symbol',
+            'distance'
+        ];
+        return uiFieldDestination(field, context);
+    }
     var dispatch = d3_dispatch('change');
     var _isMulti = (field.type === 'multiCombo' || field.type === 'manyCombo');
     var _isNetwork = (field.type === 'networkCombo');
