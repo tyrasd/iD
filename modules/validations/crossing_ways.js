@@ -6,12 +6,15 @@ import { actionMergeNodes } from '../actions/merge_nodes';
 import { actionSplit } from '../actions/split';
 import { modeSelect } from '../modes/select';
 import { geoAngle, geoExtent, geoLatToMeters, geoLonToMeters, geoLineIntersection,
-    geoSphericalClosestNode, geoSphericalDistance, geoVecAngle, geoVecLength, geoMetersToLat, geoMetersToLon } from '../geo';
+    geoSphericalClosestNode, geoSphericalDistance, geoVecAngle, geoVecLength,
+    geoMetersToLat, geoMetersToLon } from '../geo';
+import { geoVecLengthSquare } from '../geo/vector';
 import { osmNode } from '../osm/node';
 import { osmFlowingWaterwayTagValues, osmPathHighwayTagValues, osmRailwayTrackTagValues, osmRoutableAerowayTags, osmRoutableHighwayTagValues } from '../osm/tags';
 import { t } from '../core/localizer';
 import { utilDisplayLabel } from '../util/utilDisplayLabel';
 import { validationIssue, validationIssueFix } from '../core/validation';
+import { osmWay } from '../osm';
 
 
 export function validationCrossingWays(context) {
@@ -485,11 +488,13 @@ export function validationCrossingWays(context) {
                         icon: 'iD-icon-layers',
                         title: t.append('issues.fix.use_different_levels.title')
                     }));
-                } else if (isCrossingTunnels ||
-                    isCrossingBridges ||
-                    featureType1 === 'building' ||
-                    featureType2 === 'building')  {
 
+                } else if (isCrossingTunnels || isCrossingBridges ||
+                           featureType1 === 'building' || featureType2 === 'building')  {
+                    if (featureType1 === 'building' && featureType2 === 'highway' ||
+                        featureType2 === 'building' && featureType1 === 'highway')  {
+                        fixes.push(makeAddBuildingPassageFix(crossing.wayInfos));
+                    }
                     fixes.push(makeChangeLayerFix('higher'));
                     fixes.push(makeChangeLayerFix('lower'));
 
@@ -534,7 +539,110 @@ export function validationCrossingWays(context) {
         }
     }
 
-    function makeAddBridgeOrTunnelFix(fixTitleID, iconName, bridgeOrTunnel){
+    function makeAddBuildingPassageFix(wayInfos) {
+        let building, highway;
+        if (wayInfos[0].featureType === 'building') {
+            building = wayInfos[0].way;
+            highway = wayInfos[1].way;
+        } else {
+            building = wayInfos[1].way;
+            highway = wayInfos[0].way;
+        }
+        // todo: multipolygon: check all ways
+
+        return new validationIssueFix({
+            icon: 'fas-archway',
+            title: t.append('issues.fix.add_a_building_passage.title'),
+            onClick: function(context) {
+                const mode = context.mode();
+                if (!mode || mode.id !== 'select') return;
+
+                const graph = context.graph();
+
+                const resultWayIDs = [highway.id];
+                let intersections = [];
+
+                for (let i = 1; i < highway.nodes.length; i++) {
+                    const n1 = graph.hasEntity(highway.nodes[i - 1]);
+                    const n2 = graph.hasEntity(highway.nodes[i]);
+                    const segment1 = [n1.loc, n2.loc];
+
+                    for (let j = 1; j < building.nodes.length; j++) {
+                        const nA = graph.hasEntity(building.nodes[j - 1]);
+                        const nB = graph.hasEntity(building.nodes[j]);
+                        const segment2 = [nA.loc, nB.loc];
+
+                        var point = geoLineIntersection(segment1, segment2);
+                        if (point) {
+                            intersections.push({
+                                loc: point,
+                                edges: {
+                                    'Building': [nA.id, nB.id],
+                                    'Highway': [n1.id, n2.id]
+                                },
+                                idx: intersections.length
+                            });
+                        }
+                    }
+                }
+
+                const newVertices = [];
+                for (const intersection of intersections) {
+                    newVertices.push(osmNode({ loc: intersection.loc }));
+                }
+
+                function intersectionsSortedByEdge(which) {
+                    const intersectionsByEdge = {};
+                    for (const intersection of intersections) {
+                        const edgeHash = intersection.edges[which][0] + intersection.edges[which][1];
+                        if (!intersectionsByEdge[edgeHash]) intersectionsByEdge[edgeHash] = [];
+                        intersectionsByEdge[edgeHash].push(intersection);
+                    }
+                    const result = [];
+                    for (const edgeIntersections of Object.values(intersectionsByEdge)) {
+                        edgeIntersections.sort((a,b) => {
+                            const edgeCoords = a.edges[which].map(id => graph.hasEntity(id)).map(node => node.loc);
+                            return geoVecLengthSquare(edgeCoords[0], a.loc) - geoVecLengthSquare(edgeCoords[0], b.loc);
+                        });
+                        result.push(edgeIntersections[0]);
+                        for (const intersection of edgeIntersections.slice(1)) {
+                            intersection.edges[which] = [
+                                newVertices[result[result.length - 1].idx].id,
+                                intersection.edges[which][1]
+                            ];
+                            result.push(intersection);
+                        }
+                    }
+                    return result;
+                }
+
+                var action = function actionAddStructure(graph) {
+                    graph = newVertices.reduce((graph, node) => graph.replace(node), graph);
+                    // add new vertices to highway edges
+                    for (const intersection of intersectionsSortedByEdge('Highway')) {
+                        const newNode = newVertices[intersection.idx];
+                        graph = actionAddMidpoint({ loc: intersection.loc, edge: intersection.edges.Highway }, newNode)(graph);
+                    }
+                    // split highway at new vertices
+                    const newWays = newVertices.map(() => osmWay());
+                    graph = newWays.reduce((graph, way) => graph.replace(way), graph);
+                    graph = actionSplit(newVertices.map(node => node.id), newWays.map(way => way.id))(graph);
+                    resultWayIDs.push(...newWays.map(way => way.id));
+                    // add new vertices to building edges
+                    for (const intersection of intersectionsSortedByEdge('Building')) {
+                        const newNode = newVertices[intersection.idx];
+                        graph = actionAddMidpoint({ loc: intersection.loc, edge: intersection.edges.Building }, newNode)(graph);
+                    }
+                    return graph;
+                };
+
+                context.perform(action, t('issues.fix.add_a_building_passage.annotation'));
+                context.enter(modeSelect(context, resultWayIDs));
+            }
+        });
+    }
+
+    function makeAddBridgeOrTunnelFix(fixTitleID, iconName, bridgeOrTunnel) {
         return new validationIssueFix({
             icon: iconName,
             title: t.append('issues.fix.' + fixTitleID + '.title'),
