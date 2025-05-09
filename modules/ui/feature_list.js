@@ -22,6 +22,7 @@ import {
     utilHighlightEntities,
     utilNoAuto
 } from '../util';
+import { OpenLocationCode } from '../util/openlocationcode';
 
 
 export function uiFeatureList(context) {
@@ -117,13 +118,13 @@ export function uiFeatureList(context) {
 
 
         function features() {
-            var graph = context.graph();
-            var visibleCenter = context.map().extent().center();
-            var q = search.property('value').toLowerCase().trim();
+            const graph = context.graph();
+            const visibleCenter = context.map().extent().center();
+            const q = search.property('value').trim().toLowerCase();
 
             if (!q) return [];
 
-            const locationMatch = sexagesimal.pair(q.toUpperCase()) || dmsMatcher(q);
+            let locationMatch = sexagesimal.pair(q.toUpperCase()) || dmsMatcher(q);
 
             const coordResult = [];
             if (locationMatch) {
@@ -155,6 +156,23 @@ export function uiFeatureList(context) {
                         location: lonLat
                     });
                 }
+            }
+
+            // "plus codes" / open location code
+            if (OpenLocationCode.isValid(q.toUpperCase())) {
+                if (OpenLocationCode.isFull()) {
+                    locationMatch = OpenLocationCode.decode(q.toUpperCase());
+                } else {
+                    locationMatch = OpenLocationCode.decode(
+                        OpenLocationCode.recoverNearest(q.toUpperCase(), visibleCenter[1], visibleCenter[0]));
+                }
+                coordResult.push({
+                    id: locationMatch.latitudeCenter + '/' + locationMatch.longitudeCenter,
+                    geometry: 'point',
+                    type: t('inspector.location'),
+                    name: dmsCoordinatePair([locationMatch.longitudeCenter, locationMatch.latitudeCenter]),
+                    location: [locationMatch.latitudeCenter, locationMatch.longitudeCenter]
+                });
             }
 
             // A location search takes priority over an ID search
