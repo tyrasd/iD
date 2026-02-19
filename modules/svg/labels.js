@@ -774,9 +774,10 @@ export function textWidth(text, size, container) {
     }
     const elem = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     elem.style.fontSize = `${size}px`;
+    elem.style.fontWeight = 'bold';
     elem.textContent = text;
     container.appendChild(elem);
-    c[text] = elem.getComputedTextLength();
+    c[text] = Math.ceil(elem.getComputedTextLength());
     elem.remove();
     return c[text];
 }

@@ -426,6 +426,11 @@ export function uiSectionRawMembershipEditor(context) {
                     .append('img')
                     .classed('member-entity-icon', true)
                     .attr('src', matched.imageURL);
+            } else if (d.relation.tags['osmc:symbol']) {
+                d3_select(this)
+                    .append('img')
+                    .classed('member-entity-icon', true)
+                    .attr('src', `https://hiking.waymarkedtrails.org/api/v1/symbols/from_tags/NAT?osmc:symbol=${d.relation.tags['osmc:symbol']}`);
             }
         });
 
