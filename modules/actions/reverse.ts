@@ -43,7 +43,7 @@ export function actionReverse(entityID: EntityId, options?: ReverseOptions): Act
         [/:forward:/, ':backward:'],
         [/:backward:/, ':forward:']
     ];
-    var valueReplacements: Record<string, string> = {
+    var valueReplacements: Record<TagValue, TagValue> = {
         left: 'right',
         right: 'left',
         up: 'down',
@@ -83,13 +83,13 @@ export function actionReverse(entityID: EntityId, options?: ReverseOptions): Act
         forwards: 'backward',
         backwards: 'forward'
     };
-    var onewayReplacements: Record<string, string> = {
+    var onewayReplacements: Record<TagValue, TagValue> = {
         yes: '-1',
         '1': '-1',
         '-1': 'yes'
     };
 
-    var compassReplacements: Record<string, string> = {
+    var compassReplacements: Record<TagValue, TagValue> = {
         N: 'S',
         NNE: 'SSW',
         NE: 'SW',
@@ -109,7 +109,7 @@ export function actionReverse(entityID: EntityId, options?: ReverseOptions): Act
     };
 
 
-    function reverseKey(key: string) {
+    function reverseKey(key: TagKey) {
         if (keysToKeepUnchanged.some(keyRegex => keyRegex.test(key))) {
             return key;
         }
@@ -123,7 +123,7 @@ export function actionReverse(entityID: EntityId, options?: ReverseOptions): Act
     }
 
 
-    function reverseValue(key: string, value: string, includeAbsolute: boolean, allTags: Tags) {
+    function reverseValue(key: TagKey, value: TagValue, includeAbsolute: boolean, allTags: Tags) {
         for (let { keyRegex, prerequisiteTags } of keyValuesToKeepUnchanged) {
             if (keyRegex.test(key) && prerequisiteTags.some(expectedTags =>
                 Object.entries(expectedTags).every(([k, v]) => {
@@ -160,8 +160,8 @@ export function actionReverse(entityID: EntityId, options?: ReverseOptions): Act
         return valueReplacements[value] || value;
     }
 
-    /** @returns {false | string} - returns false or the name of the direction key */
-    function supportsDirectionField(node: OsmEntity, graph: coreGraph): false | string {
+    /** @returns returns false or the name of the direction key */
+    function supportsDirectionField(node: OsmEntity, graph: coreGraph): false | TagKey {
         // @ts-expect-error -- will be fixed in a different PR
         const preset = presetManager.match(node, graph);
         const loc = node.extent(graph).center();
